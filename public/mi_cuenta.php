@@ -1,10 +1,7 @@
 <?php
-session_start();
+require_once __DIR__ . '/../app/auth.php';
 
-if (!isset($_SESSION["user"])) {
-    header("Location: login.php");
-    exit();
-}
+requireLogin();
 
 $pageTitle = "Mi Cuenta";
 $containerClass = "narrow";

@@ -4,7 +4,7 @@ session_start();
 require "../app/auth.php";
 require_once __DIR__ . '/../db/config.php';
 require_once __DIR__ . '/../includes/error_handler.php';
-require_once __DIR__ . '/../app/auth_check.php';
+
 
 requireRole(["admin", "tecnico"]);
 
