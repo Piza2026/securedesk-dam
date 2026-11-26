@@ -4,6 +4,7 @@ session_start();
 require_once __DIR__ . '/../db/config.php';
 require_once __DIR__ . '/../includes/error_handler.php';
 require "../app/auth.php";
+require_once __DIR__ . '/../app/audit_helper.php';
 
 
 requireLogin();
@@ -62,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["comment"])) {
         ");
         $stmt->execute([$ticket_id, $user_id, $comment]);
 
-        logAction($db, $user_id, "Añadió comentario", $ticket_id);
+        logAudit($db, $user_id, "ADD_COMMENT", "ticket", $ticket_id);
     }
 
     header("Location: ticket_detail.php?id=" . $ticket_id);
@@ -187,7 +188,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["description"])) {
         saveHistory($db, $id, $user_id, "assigned_to", $old["assigned_to"], $assigned);
     }
 
-    logAction($db, $user_id, "Editó ticket", $id);
+        logAudit($db, $user_id, "EDIT_TICKET", "ticket", $id);
 
     header("Location: ticket_detail.php?id=".$id);
     exit();

@@ -10,3 +10,7 @@ function logAudit($db, $userId, $action, $entity = null, $entityId = null, $deta
 
     $stmt->execute([$userId, $action, $entity, $entityId, $details, $ip]);
 }
+
+function logExport($db, $userId, $format, $entity = "tickets") {
+    logAudit($db, $userId, "EXPORT_" . strtoupper($format), $entity);
+}

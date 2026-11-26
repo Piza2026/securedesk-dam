@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../db/config.php';
 require_once __DIR__ . '/../app/auth.php';
+require_once __DIR__ . '/../app/audit_helper.php';
 
 requireLogin();
 
@@ -90,7 +91,7 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     .section { margin-bottom: 30px; }
 
-    /* 👇 NUEVO */
+    
     .report-header {
         border-bottom: 2px solid #000;
         margin-bottom: 20px;
