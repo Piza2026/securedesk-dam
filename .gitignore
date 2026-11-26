@@ -1,0 +1,22 @@
+# Copias antiguas y de seguridad
+/securedesk-dam/
+/backup_estilos/
+*.bak
+db/securedeskold.sqlite
+db/*.sqbpro
+
+# Archivos subidos por usuarios
+/uploads/*
+!/uploads/.htaccess
+!/uploads/.gitkeep
+
+# Ejercicio no relacionado
+public/import java.util.java
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales de SQLite
+db/*.sqlite-wal
+db/*.sqlite-shm
