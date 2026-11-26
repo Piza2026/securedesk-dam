@@ -1,46 +1,62 @@
 <?php
-session_start();
 require_once __DIR__ . '/../db/config.php';
-require "../app/auth.php";
+require_once __DIR__ . '/../app/auth.php';
 
-if (!isset($_SESSION["user_id"])) {
-    die("Acceso denegado");
-}
+requireLogin();
 
-$user_id = $_SESSION["user_id"];
-// 👇 NUEVO
-$usuario = $_SESSION["user"]["name"] ?? ("User #" . $user_id);
+// $forPdf lo define ticket_pdf.php cuando incluye esta plantilla
+$forPdf = $forPdf ?? false;
+
+$user_id = $_SESSION["user"]["id"];
+$usuario = $_SESSION["user"]["username"];
 $fecha_generacion = date("d/m/Y H:i");
 $ticket_id = $_GET["id"] ?? null;
 
 if (!$ticket_id) {
-    die("Ticket no encontrado");
+    notFound("Ticket no encontrado");
 }
 
-// Registrar exportación en auditoría
-logExport($db, $user_id, "TICKET_HTML");
-
 // Datos del ticket
-$stmt = $db->prepare("SELECT * FROM tickets WHERE id = ?");
+$stmt = $db->prepare("
+    SELECT t.*, u.username AS assigned_name
+    FROM tickets t
+    LEFT JOIN users u ON u.id = t.assigned_to
+    WHERE t.id = ?
+");
 $stmt->execute([$ticket_id]);
 $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$ticket) {
-    die("Ticket no encontrado");
+    notFound("Ticket no encontrado");
 }
 
+// Registrar exportación en auditoría
+logExport($db, $user_id, $forPdf ? "TICKET_PDF" : "TICKET_HTML");
+
 // Comentarios del ticket
-$stmt = $db->prepare("SELECT * FROM comments WHERE ticket_id = ? ORDER BY created_at ASC");
+$stmt = $db->prepare("
+    SELECT c.comment, c.created_at, u.username
+    FROM comments c
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE c.ticket_id = ?
+    ORDER BY c.created_at ASC
+");
 $stmt->execute([$ticket_id]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Historial de cambios críticos
-$stmt = $db->prepare("SELECT * FROM ticket_history WHERE ticket_id = ? ORDER BY created_at ASC");
+// Historial de cambios
+$stmt = $db->prepare("
+    SELECT h.field_changed, h.old_value, h.new_value, h.created_at, u.username
+    FROM ticket_history h
+    LEFT JOIN users u ON u.id = h.user_id
+    WHERE h.ticket_id = ?
+    ORDER BY h.created_at ASC
+");
 $stmt->execute([$ticket_id]);
 $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Adjuntos
-$stmt = $db->prepare("SELECT * FROM attachments WHERE ticket_id = ?");
+$stmt = $db->prepare("SELECT file_name, mime_type, created_at FROM ticket_attachments WHERE ticket_id = ?");
 $stmt->execute([$ticket_id]);
 $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -123,7 +139,7 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <tr><th>Título</th><td><?= htmlspecialchars($ticket["title"]) ?></td></tr>
         <tr><th>Estado</th><td><?= htmlspecialchars($ticket["status"]) ?></td></tr>
         <tr><th>Prioridad</th><td><?= htmlspecialchars($ticket["priority"]) ?></td></tr>
-        <tr><th>Asignado a</th><td><?= htmlspecialchars($ticket["assigned_to"] ?? "Sin asignar") ?></td></tr>
+        <tr><th>Asignado a</th><td><?= htmlspecialchars($ticket["assigned_name"] ?? "Sin asignar") ?></td></tr>
         <tr><th>Creado</th><td><?= htmlspecialchars($ticket["created_at"]) ?></td></tr>
         <tr><th>Última actualización</th><td><?= htmlspecialchars($ticket["updated_at"] ?? "-") ?></td></tr>
     </table>
@@ -139,7 +155,7 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </tr>
         <?php foreach ($comments as $c): ?>
         <tr>
-            <td><?= htmlspecialchars($c["user"] ?? "Desconocido") ?></td>
+            <td><?= htmlspecialchars($c["username"] ?? "Desconocido") ?></td>
             <td><?= htmlspecialchars($c["comment"]) ?></td>
             <td><?= htmlspecialchars($c["created_at"]) ?></td>
         </tr>
@@ -157,8 +173,8 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </tr>
         <?php foreach ($history as $h): ?>
         <tr>
-            <td><?= htmlspecialchars($h["user"] ?? "Desconocido") ?></td>
-            <td><?= htmlspecialchars($h["action"]) ?></td>
+            <td><?= htmlspecialchars($h["username"] ?? "Desconocido") ?></td>
+            <td><?= htmlspecialchars($h["field_changed"] . ": " . ($h["old_value"] ?? "-") . " → " . ($h["new_value"] ?? "-")) ?></td>
             <td><?= htmlspecialchars($h["created_at"]) ?></td>
         </tr>
         <?php endforeach; ?>
@@ -175,8 +191,8 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </tr>
         <?php foreach ($attachments as $a): ?>
         <tr>
-            <td><?= htmlspecialchars($a["filename"]) ?></td>
-            <td><?= htmlspecialchars($a["mime_type"]) ?></td>
+            <td><?= htmlspecialchars($a["file_name"]) ?></td>
+            <td><?= htmlspecialchars($a["mime_type"] ?? "-") ?></td>
             <td><?= htmlspecialchars($a["created_at"]) ?></td>
         </tr>
         <?php endforeach; ?>
@@ -185,7 +201,9 @@ $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="footer">
     Documento generado automáticamente por SecureDesk DAM
 </div>
+<?php if (!$forPdf): ?>
 <button onclick="window.print()">Imprimir Informe</button>
+<?php endif; ?>
 
 </body>
 </html>
