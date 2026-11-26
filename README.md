@@ -8,13 +8,13 @@ Permite a un equipo de soporte crear tickets, asignarlos a técnicos, seguir su 
 
 ## Funcionalidades
 
-- **Tickets**: crear, editar, filtrar (estado, prioridad, texto), asignar a técnicos, comentarios y adjuntos.
+- **Tickets**: crear, editar, filtrar (estado, prioridad, texto), asignar a técnicos, comentarios, adjuntos descargables e historial de cambios.
 - **Panel** con métricas por estado, prioridad y categoría, y accesos rápidos (críticos, sin asignar).
 - **Roles** con permisos distintos:
 
   | Rol | Puede |
   |---|---|
-  | `admin` | Todo: tickets, auditoría, usuarios, exportaciones |
+  | `admin` | Todo: tickets, auditoría y exportaciones |
   | `tecnico` | Crear y editar tickets, comentar, subir adjuntos, exportar |
   | `lector` | Solo consultar tickets |
 
@@ -28,7 +28,10 @@ Permite a un equipo de soporte crear tickets, asignarlos a técnicos, seguir su 
 - **Token CSRF** en los formularios.
 - Escapado de salida con `htmlspecialchars()` (prevención de XSS).
 - Control de acceso por rol en servidor (`requireLogin()` / `requireRole()`).
-- Cierre de sesión automático por inactividad (15 min).
+- **Bloqueo tras 5 intentos fallidos** de inicio de sesión durante 15 minutos (también para usuarios inexistentes, para no revelar cuáles existen).
+- Regeneración del identificador de sesión al iniciar sesión (prevención de fijación de sesión).
+- Cierre de sesión automático tras 15 minutos de inactividad, aplicado en todas las páginas protegidas.
+- Al cerrar sesión se destruye la sesión en el servidor, no solo la cookie.
 - Subida de archivos validada por **tamaño, extensión y tipo MIME real**, con nombres aleatorios y descarga a través de PHP.
 - Carpetas internas (`db/`, `app/`, `includes/`, `views/`, `uploads/`, `vendor/`) bloqueadas al acceso web con `.htaccess`; solo `public/` es accesible.
 - Páginas de error propias (403, 404, 500) sin exponer detalles internos.
@@ -56,6 +59,16 @@ Requisitos: [XAMPP](https://www.apachefriends.org/) (Apache + PHP 8.x con la ext
 3. Entra en **http://localhost/securedesk-dam/**
 
 No hace falta instalar nada más: la base de datos SQLite con datos de ejemplo y las dependencias (`vendor/`) están incluidas.
+
+### Sin XAMPP
+
+Con PHP 8 instalado, desde la carpeta del proyecto:
+
+```bash
+php -S localhost:8000 -t public
+```
+
+Y abre **http://localhost:8000**.
 
 ### Usuarios de prueba
 
