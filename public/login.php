@@ -1,15 +1,14 @@
 <?php
 session_start();
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 require_once __DIR__ . '/../db/config.php';
-require "../app/auth.php";
-require "../app/audit_helper.php";
+require_once __DIR__ . '/../app/auth.php';
+require_once __DIR__ . '/../app/audit_helper.php';
 require_once __DIR__ . '/../includes/error_handler.php';
 
 $error = "";
+$maxIntentos = 5;      // fallos permitidos antes de bloquear
+$minutosBloqueo = 15;  // duración del bloqueo
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -25,37 +24,82 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $error = "Usuario y contraseña obligatorios";
     } else {
 
-        $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");
+        // 1. Consultar los intentos fallidos de este usuario
+        $stmt = $db->prepare("
+            SELECT attempts,
+                   blocked_until > datetime('now') AS bloqueado,
+                   blocked_until IS NOT NULL      AS tuvo_bloqueo
+            FROM login_attempts
+            WHERE username = ?
+        ");
         $stmt->execute([$username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $intento = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && password_verify($password, $user["password_hash"])) {
+        if ($intento && $intento["bloqueado"]) {
 
-            $_SESSION["user"] = [
-                "id" => $user["id"],
-                "username" => $user["username"],
-                "role" => $user["role"]
-            ];
-            $_SESSION["last_activity"] = time();
-
-            // limpiar intentos
-            $stmt = $db->prepare("DELETE FROM login_attempts WHERE username = ?");
-            $stmt->execute([$username]);
-
-            logAudit($db, $user["id"], "LOGIN_OK", "user", $user["id"], $ip);
-
-            header("Location: dashboard.php");
-            exit();
+            // 2. Usuario bloqueado: no se comprueba ni la contraseña
+            logAudit($db, null, "LOGIN_BLOCKED", "user", null, $username);
+            $error = "Demasiados intentos fallidos. Inténtalo de nuevo en $minutosBloqueo minutos.";
 
         } else {
 
-            logAudit($db, null, "LOGIN_FAIL", "user", null, $username);
+            $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $error = "Credenciales incorrectas";
+            if ($user && password_verify($password, $user["password_hash"])) {
+
+                // 3. Login correcto: nueva sesión y contador a cero
+                session_regenerate_id(true);
+
+                $_SESSION["user"] = [
+                    "id" => $user["id"],
+                    "username" => $user["username"],
+                    "role" => $user["role"]
+                ];
+                $_SESSION["last_activity"] = time();
+
+                $stmt = $db->prepare("DELETE FROM login_attempts WHERE username = ?");
+                $stmt->execute([$username]);
+
+                logAudit($db, $user["id"], "LOGIN_OK", "user", $user["id"], $ip);
+
+                header("Location: dashboard.php");
+                exit();
+
+            } else {
+
+                // 4. Login fallido: sumar un intento (o empezar de 1 si ya pasó un bloqueo)
+                $intentos = ($intento && !$intento["tuvo_bloqueo"]) ? $intento["attempts"] + 1 : 1;
+                $bloquear = $intentos >= $maxIntentos ? 1 : 0;
+
+                if ($intento) {
+                    $stmt = $db->prepare("
+                        UPDATE login_attempts
+                        SET attempts = ?, ip_address = ?, last_attempt = datetime('now'),
+                        blocked_until = CASE WHEN CAST(? AS INTEGER) = 1 THEN datetime('now', ?) ELSE NULL END
+                        WHERE username = ?
+                    ");
+                    $stmt->execute([$intentos, $ip, $bloquear, "+$minutosBloqueo minutes", $username]);
+                } else {
+                    $stmt = $db->prepare("
+                        INSERT INTO login_attempts (username, ip_address, attempts, last_attempt)
+                        VALUES (?, ?, 1, datetime('now'))
+                    ");
+                    $stmt->execute([$username, $ip]);
+                }
+
+                logAudit($db, null, "LOGIN_FAIL", "user", null, $username);
+
+                $error = $bloquear
+                    ? "Demasiados intentos fallidos. Inténtalo de nuevo en $minutosBloqueo minutos."
+                    : "Credenciales incorrectas";
+            }
         }
     }
 }
 ?>
+
 
 <?php
 $pageTitle = "Login";
