@@ -312,7 +312,7 @@ require __DIR__ . '/../views/layout_start.php';
         <h3>Adjuntos</h3>
         <?php if (!$files): ?><p class="subtitle">Sin adjuntos.</p><?php endif; ?>
         <?php foreach ($files as $f): ?>
-            <p>📎 <?= htmlspecialchars($f["file_name"]) ?></p>
+            <p>📎 <a href="download.php?id=<?= (int)$f["id"] ?>"><?= htmlspecialchars($f["file_name"]) ?></a></p>
         <?php endforeach; ?>
 
         <?php if (!$isReader): ?>

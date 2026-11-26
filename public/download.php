@@ -1,38 +1,32 @@
 <?php
-session_start();
 require_once __DIR__ . '/../db/config.php';
+require_once __DIR__ . '/../app/auth.php';
 
-if (!isset($_SESSION["user"])) {
-    header("Location: login.php");
-    exit();
-}
+requireLogin();
 
 $id = $_GET["id"] ?? null;
 
 if (!$id) {
-    exit("Archivo no encontrado");
+    notFound("Archivo no encontrado");
 }
 
-$sql = "SELECT * FROM attachments WHERE id = ?";
-$stmt = $db->prepare($sql);
+$stmt = $db->prepare("SELECT * FROM ticket_attachments WHERE id = ?");
 $stmt->execute([$id]);
-
 $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$file) {
-    exit("Archivo no encontrado");
+    notFound("Archivo no encontrado");
 }
 
-$path = $file["filepath"];
+$path = $file["file_path"];
 
 if (!file_exists($path)) {
-    exit("Archivo no existe");
+    notFound("El archivo ya no existe en el servidor");
 }
 
-header("Content-Type: application/octet-stream");
-header("Content-Disposition: attachment; filename=\"" . $file["filename"] . "\"");
+header("Content-Type: " . ($file["mime_type"] ?: "application/octet-stream"));
+header("Content-Disposition: attachment; filename=\"" . basename($file["file_name"]) . "\"");
 header("Content-Length: " . filesize($path));
 
 readfile($path);
 exit();
-?>
