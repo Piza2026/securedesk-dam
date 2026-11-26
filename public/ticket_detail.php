@@ -11,7 +11,7 @@ if (!isset($_SESSION["user"])) {
     exit();
 }
 
-// 🎯 Roles
+//Roles
 $role = $_SESSION["user"]["role"];
 $isAdmin = $role === "admin";
 $isTech = $role === "tecnico";
@@ -19,14 +19,14 @@ $isReader = $role === "lector";
 
 $user_id = $_SESSION["user"]["id"];
 
-// 🔎 ID ticket
+//ID ticket
 $id = $_GET["id"] ?? null;
 
 if (!$id) {
     notFound("ID de ticket no proporcionado");
 }
 
-// 🔎 Ticket
+//Ticket
 $stmt = $db->prepare("SELECT * FROM tickets WHERE id = ?");
 $stmt->execute([$id]);
 $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -35,7 +35,7 @@ if (!$ticket) {
     notFound("El ticket no existe o ha sido eliminado");
 }
 
-// 📜 Historial
+//Historial
 function saveHistory($db, $ticket_id, $user_id, $field, $old, $new) {
     $stmt = $db->prepare("
         INSERT INTO ticket_history
@@ -176,6 +176,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["description"])) {
     ");
 
     $stmt->execute([$description, $status, $priority, $assigned, $id]);
+
+    // Guardar en el historial los campos que han cambiado
+    if ($old["status"] !== $status) {
+        saveHistory($db, $id, $user_id, "status", $old["status"], $status);
+    }
+
+    if ($old["priority"] !== $priority) {
+        saveHistory($db, $id, $user_id, "priority", $old["priority"], $priority);
+    }
+
+    if ((string)($old["assigned_to"] ?? "") !== (string)($assigned ?? "")) {
+        saveHistory($db, $id, $user_id, "assigned_to", $old["assigned_to"], $assigned);
+    }
 
     logAction($db, $user_id, "Editó ticket", $id);
 
