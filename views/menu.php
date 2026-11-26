@@ -32,6 +32,6 @@ if (!function_exists("navLink")) {
 <?php else: ?>
     <?php navLink("index.php", "Home", $current); ?>
     <?php navLink("login.php", "Login", $current); ?>
-    <?php navLink("tickets.php", "Tickets", $current); ?>
+    
 <?php endif; ?>
 </nav>
